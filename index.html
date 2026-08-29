@@ -1,4 +1,188 @@
 <!DOCTYPE html>
+<!--
+================================================================================
+  TRAININGSLOG – ENTWICKLER- UND ANPASSUNGS-DOKUMENTATION
+  (Diese Doku ist bewusst IN der App eingebettet, damit sie nie verlorengeht und
+   nie von der App wegdriftet. Sie ist ein HTML-Kommentar und erscheint NICHT
+   auf dem Bildschirm. Wer diese Datei öffnet – Mensch oder KI – findet hier
+   alles, um die App sicher zu verstehen und zu ändern, ohne das ursprüngliche
+   Entstehungsgespräch zu kennen.)
+================================================================================
+
+--------------------------------------------------------------------------------
+0. WIE DU (KI ODER MENSCH) DIESE DATEI ÄNDERST – ZUERST LESEN
+--------------------------------------------------------------------------------
+- Die GESAMTE App ist EINE einzige Datei: index.html. HTML, CSS und JavaScript
+  liegen zusammen in dieser Datei. Es gibt KEINE externen Dateien, KEINE
+  Bibliotheken, KEIN Framework, KEINEN Build-Schritt. Das ist ABSICHT (siehe
+  Abschnitt 6). Halte das bei jeder Änderung ein: nichts auslagern, nichts
+  extern nachladen. Alles bleibt inline in dieser Datei.
+- Diese Doku bei JEDER Änderung mitpflegen. Wenn du Code änderst, aktualisiere
+  den betroffenen Doku-Abschnitt im selben Zug. Sonst driftet die Doku weg –
+  genau das soll die Einbettung verhindern.
+- Nach dem Ändern IMMER die JavaScript-Syntax prüfen, bevor ausgeliefert wird.
+  Die App hat keinen Build, ein Syntaxfehler macht sie stumm unbenutzbar.
+
+DEPLOY / WIE EINE ÄNDERUNG AUFS IPHONE KOMMT:
+- Die App wird über GitHub Pages gehostet (öffentliches Repo des Nutzers,
+  Datei liegt dort als index.html). Live-Adresse ist eine GitHub-Pages-URL der
+  Form https://<user>.github.io/<repo>/ .
+- Eine geänderte Version wird als index.html bei GitHub hochgeladen und
+  überschreibt die alte. Adresse UND gespeicherte Nutzerdaten bleiben dabei
+  erhalten (Daten hängen an der URL, nicht an der Datei).
+- Der Nutzer betreibt die App als "Zum Home-Bildschirm hinzugefügte" App
+  (PWA/Home-Screen-App) in Safari auf iOS. NUR so funktioniert der Wake Lock
+  (Bildschirm bleibt beim Training an). Als lose lokale Datei oder in manchen
+  Dritt-Browsern funktioniert Wake Lock NICHT. Beim Ändern nichts tun, was die
+  PWA-Installierbarkeit bricht (Manifest, apple-touch-icon, Meta-Tags im <head>).
+
+NICHT VERSEHENTLICH BRECHEN (Regressionsgefahr):
+- localStorage-Speicherung (Abschnitt 3) – sonst Datenverlust beim Nutzer.
+- Wake Lock (Abschnitt 3) – sonst geht der Bildschirm beim Training aus.
+- PWA-Einbettung im <head> (Manifest + Icon + Meta-Tags als Data-URIs).
+- Timer/Ton-Logik (Abschnitt 3) – Kernfunktion während des Trainings.
+- CSV-Export-Struktur (Abschnitt 3) – der Nutzer wertet die CSV langfristig aus.
+
+--------------------------------------------------------------------------------
+1. ZWECK & KONTEXT
+--------------------------------------------------------------------------------
+Persönlicher Trainingslog für EINEN Nutzer (Krafttraining, Muskelaufbau).
+Der Nutzer trainiert typ. 3x/Woche (Di/Do/Sa) und nutzt die App über Jahre.
+Zweck: Sätze/Gewichte/Wiederholungen pro Übung erfassen, Doppelprogression
+unterstützen, Pausen-Timer mit Ton, Verlauf speichern, CSV zur Auswertung.
+
+RAHMENBEDINGUNGEN DES NUTZERS (können sich ändern – dann Plan anpassen):
+- Zwei Wohnungen, nie beide gleichzeitig. Wohnung A: verstellbare Schrägbank +
+  Verstellhantel mit 1-kg-Schritten. Wohnung B: KEINE Bank, Hantel mit nur
+  2,5-kg-Schritten. Daher der Orts-/Bank-Schalter (mit Bank / ohne Bank) und
+  zwei Gewichtsschritte. Zusätzlich Widerstandsband mit Türanker (Latzug).
+- Schichtarbeit (kann sich ändern) – deshalb keine feste Uhrzeit-Logik.
+- "Rad-Frage": An manchen Beintagen hängt ab, ob der Nutzer am Vor-Sonntag Rad
+  gefahren ist (Erholung der Beine). Steuert, welcher Tag der schwere Beintag ist.
+Wenn sich diese Rahmenbedingungen ändern (kein Schichtdienst mehr, andere
+Geräte, andere Wohnsituation): Orts-/Rad-Logik und Tagesdefinitionen anpassen.
+
+--------------------------------------------------------------------------------
+2. TRAININGSPRINZIPIEN (fachlich – siehe Abschnitt 4 zur Aktualisierung!)
+--------------------------------------------------------------------------------
+- Doppelprogression: erst Wiederholungen im Zielfenster hocharbeiten, dann
+  Gewicht steigern. Steigerung erst nach mehreren Bestätigungen (Standard 2)
+  im oberen Wdh-Bereich.
+- Intensität ~RIR 1-3 (Reps in Reserve), Training nahe technischem Versagen.
+- Wdh-Fenster je Übungstyp (grob): schwere Grund-/Beinübungen 8-12,
+  Schulterdrücken 6-12, Latzug 10-15, Bizeps/Trizeps 10-20,
+  Seitheben/Waden 12-25.
+- Progression SATZWEISE möglich (nicht nur ganze Übung) – wichtig wegen der
+  groben 2,5-kg-Hantel in Wohnung B (siehe Abschnitt 4B).
+- Übungsauswahl-Leitprinzip: Übungen, die den Muskel in gedehnter Position stark
+  belasten, werden bevorzugt (Stand der Forschung 2024/25). Daraus entstehen die
+  objektiv sortierten Ranglisten je Muskel-Slot.
+
+--------------------------------------------------------------------------------
+3. CODE-STRUKTUR (wo liegt was)
+--------------------------------------------------------------------------------
+Alles in dieser index.html. Grobe Landkarte (Zeilennummern verschieben sich bei
+Änderungen – nach den genannten Namen/Stichworten suchen):
+
+- <head>: Meta-Tags, PWA-Manifest + apple-touch-icon (als Data-URIs inline),
+  danach <style> mit allen CSS-Variablen (:root) und Regeln.
+- const SLOTS = { ... }  → ZENTRALE Übungsdatenbank. Pro Slot (z.B. Brust,
+  Rücken, Beine-quad, Beine-hinge, Schulter, Bizeps, Trizeps, Waden) eine Liste
+  von Übungen in OBJEKTIVER Rangfolge (beste zuerst = Standard). Pro Übung:
+  Name, Wdh-Bereich (lo/hi), Flags wie bankOnly (nur mit Bank nutzbar),
+  ggf. Marker/Hinweise. HIER ändert man Übungen/Geräte am einfachsten.
+- function daySlots(dayKey) → welche Slots an welchem Tag (Di/Do/Sa) trainiert
+  werden, inkl. der Rad-abhängigen Wahl des schweren Beintags.
+- function step() → aktueller Gewichtsschritt (pref.stepBank / pref.stepNoBank
+  je nach Orts-Schalter).
+- Progressions-/Bestwert-Logik: bestUpdate(), applyWeight(), "suggest"-Felder →
+  berechnen Steigerungsvorschläge und führen Bestwerte pro Satz-Position/Gewicht.
+- Timer/Ton: startExPause() (stille Übungspause, Ton am Ende), Satz-Pause-Timer
+  (sichtbarer roter Countdown), tickSoft()/tickLoud() (Pieptöne), tone()/prime()
+  (WebAudio). Läuft nur zuverlässig bei aktivem Bildschirm → Wake Lock.
+- Wake Lock: wakeOn()/wakeOff() + visibilitychange-Reaktivierung. Standard-API,
+  browserunabhängig, überspringt still wo nicht verfügbar.
+- Speicher: const K = {...} (localStorage-Schlüssel), save()/load(). Alle
+  Nutzerdaten liegen im localStorage, gebunden an die URL. Schlüssel u.a.:
+  hist (Verlauf), last (letzte Werte je Übung), best (Bestwerte),
+  struct (Satz-/Pausen-Struktur), swap (aktive Übung je Slot),
+  custom (eigene Übungen je Slot), pref (Einstellungen), radwk (Rad-Status).
+- Export: buildCSV() (lesbare/auswertbare Tabelle, Semikolon-getrennt, BOM,
+  eine Zeile pro Satz, mit Kontextspalten Ort/Rad/Status), buildBackupBlob()
+  (vollständiges JSON-Backup zur Wiederherstellung), shareOrDownload()
+  (iOS-Teilen-Menü mit Datei, Fallback Download), exportData()/exportCSV().
+- restoreData(): spielt ein JSON-Backup zurück (ersetzt aktuellen Stand).
+
+--------------------------------------------------------------------------------
+4. ZWEI ARTEN VON ENTSCHEIDUNGEN – UNBEDINGT UNTERSCHEIDEN
+--------------------------------------------------------------------------------
+Beim Anpassen der App gibt es ZWEI grundverschiedene Kategorien. Sie dürfen
+NICHT gleich behandelt werden.
+
+4A. FACHLICH / EVIDENZBASIERT  → AKTIV NACH NEUESTER FORSCHUNG AKTUALISIEREN
+    Dazu gehören: die Übungs-Ranglisten in SLOTS, die Wdh-Fenster, das
+    Progressionsprinzip, das "gedehnte Position"-Leitprinzip, Satzpausen.
+    Diese beruhen auf dem TRAININGSWISSENSCHAFTLICHEN STAND 2024/25.
+    ANWEISUNG DES NUTZERS: Der Plan soll NICHT auf einem eingefrorenen Stand
+    verharren. Wer hier etwas ändert oder den Plan überarbeitet, soll VORHER
+    GEZIELT die aktuell neueste Studienlage und seriöse Fachliteratur prüfen
+    (nicht nur "dürfen" – aktiv recherchieren) und den Plan nach dem dann
+    besten verfügbaren Wissen erstellen. Diese Doku ist die Ausgangsbasis,
+    nicht die Obergrenze. Wenn neuere/detailliertere Studien der Empfehlung
+    hier widersprechen, hat die aktuelle Evidenz Vorrang.
+
+4B. PERSÖNLICH / GESUNDHEITLICH  → GESCHÜTZT, NUR MIT DEM NUTZER ÄNDERN
+    Diese Setzungen sind KEINE wissenschaftlichen Aussagen, sondern
+    Anpassungen an den KÖRPER DES NUTZERS. Keine Studie hebt sie auf.
+    NICHT "nach Studienlage wegoptimieren". Nur in Rücksprache mit dem Nutzer:
+    - RDL (rumänisches Kreuzheben) ist fachlich in der hinge-Rangliste top,
+      ist hier aber wegen des UNTEREN RÜCKENS des Nutzers NICHT der stille
+      Standard bzw. mit Vorsicht markiert. Eine KI darf das NICHT als
+      "Inkonsistenz" glattziehen und RDL zum Default machen.
+    - Schulterdrücken/Arnold-Press sind nur mit dem Marker "beobachten"
+      versehen (ärztlich abgeklärt, kein Befund; Drücken schmerzt nicht,
+      andere Bewegung schon). Das ist eine individuelle Vorsicht, kein
+      fachlicher Mangel der Übung. Nicht entfernen "weil die Übung gut ist".
+    - Der bankOnly-Ausschluss (bestimmte Übungen sind ohne Bank ausgegraut)
+      ist eine GERÄTE-Realität von Wohnung B, keine Wertung der Übung.
+
+--------------------------------------------------------------------------------
+5. ÄNDERUNGS-SPIELREGELN (zusammengefasst)
+--------------------------------------------------------------------------------
+1) Alles bleibt in DIESER einen index.html. Keine externen Dateien/Libs/Build.
+2) Diese Doku bei jeder Änderung mitpflegen.
+3) Fachliche Änderungen (4A): vorher aktuelle Forschung/Fachliteratur gezielt
+   prüfen und einarbeiten.
+4) Persönliche/gesundheitliche Setzungen (4B): geschützt, nur mit dem Nutzer.
+5) Ranglisten bleiben OBJEKTIV sortiert (beste Übung zuerst = Standard),
+   Ausnahme nur bei gesundheitlicher Einschränkung (dann als solche markiert,
+   nicht die Sortierung verfälschen).
+6) Nach der Änderung: JS-Syntax prüfen, als index.html bei GitHub hochladen.
+   PWA/Wake Lock/localStorage/Timer/CSV-Struktur nicht brechen (Abschnitt 0).
+7) Datenkompatibilität: bestehende localStorage-Schlüssel (K) nicht umbenennen
+   ohne Migration – sonst verliert der Nutzer seinen Verlauf.
+
+--------------------------------------------------------------------------------
+6. WARUM DIE ARCHITEKTUR SO IST (bewusste Wahl, kein Zufall)
+--------------------------------------------------------------------------------
+- EINE Datei, kein Framework, keine Abhängigkeiten: damit die App über viele
+  Jahre unabhängig lauffähig und von jeder KI/Person wart- und anpassbar bleibt,
+  ohne Toolchain, ohne veraltende Pakete, ohne Netzwerkabhängigkeit.
+- localStorage statt Server/Cloud: keine Konten, keine fremde Infrastruktur,
+  volle Datenhoheit beim Nutzer, offlinefähig. Preis: Daten sind an die URL
+  gebunden – deshalb die Backup-/CSV-Export-Funktionen.
+- Selbst gehostet auf GitHub Pages als PWA: nötig, damit Wake Lock (Bildschirm
+  an) auf iOS funktioniert; zugleich kostenlos, dauerhaft, versioniert.
+- Diese eingebettete Doku: damit die BEGRÜNDUNGEN (das "warum") die App
+  überleben und künftige Änderungen informiert statt blind erfolgen.
+
+  ABSICHT DES NUTZERS in einem Satz: Die App soll sich selbst erklären, damit
+  sie über Jahre wart- und anpassbar bleibt – unabhängig vom ursprünglichen
+  Gespräch, von einer bestimmten KI und vom Gedächtnis des Nutzers – und damit
+  niemand beim "Aufräumen" die gesundheitlichen Schutzentscheidungen zerstört,
+  während der fachliche Teil ausdrücklich nach neuer Forschung wachsen darf.
+================================================================================
+-->
 <html lang="de">
 <head>
 <meta charset="UTF-8">
@@ -241,7 +425,8 @@ function renderHome(){
     </div>
     <div class="toolbar">
       <button class="btn-ghost" onclick="renderSettings()">Einstellungen</button>
-      <button class="btn-ghost" onclick="exportData()">Sichern</button>
+      <button class="btn-ghost" onclick="exportData()">Backup</button>
+      <button class="btn-ghost" onclick="exportCSV()">Tabelle (CSV)</button>
       <button class="btn-ghost" onclick="showHistory()">Verlauf</button>
       <button class="btn-ghost" onclick="restoreData()">Wiederherstellen</button>
     </div>
@@ -573,9 +758,9 @@ function finishDay(){
   });
   save(K.last,last); save(K.best,best);
   const hist=load(K.hist,[]);
-  hist.push({day:working.day,date:working.date,bank:pref.bank,ex:working.ex.map(e=>e.skipped?({n:logKey(e.key),name:e.name,skipped:true}):({n:logKey(e.key),name:e.name,sets:e.sets.map(s=>({w:s.w,r:s.r,rir:s.rir})),note:e.note}))});
+  hist.push({day:working.day,date:working.date,bank:pref.bank,rad:(radWeek&&typeof radWeek.rad==="boolean")?radWeek.rad:null,ex:working.ex.map(e=>e.skipped?({n:logKey(e.key),name:e.name,skipped:true}):({n:logKey(e.key),name:e.name,sets:e.sets.map(s=>({w:s.w,r:s.r,rir:s.rir})),note:e.note}))});
   save(K.hist,hist);
-  if(confirm("Einheit gespeichert. Auch als Datei sichern (Backup)?")){ exportData(); }
+  if(confirm("Einheit gespeichert.\n\nOK = Tabelle (CSV) teilen/ablegen\nAbbrechen = überspringen")){ exportCSV(); }
   toast("Gespeichert ✓"); setTimeout(renderHome,650);
 }
 function confirmBack(){
@@ -622,11 +807,44 @@ function showHistory(){
     :`<div class="hint">Noch nichts gespeichert.</div>`);
   hideTimer();
 }
-function exportData(){
+function buildBackupBlob(){
   const data={hist:load(K.hist,[]),last:load(K.last,{}),struct:load(K.struct,{}),swap:load(K.swap,{}),custom:load(K.custom,{}),pref,radWeek,exported:new Date().toISOString()};
-  const b=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const u=URL.createObjectURL(b);
-  const a=document.createElement("a");a.href=u;a.download=`trainingslog_${new Date().toISOString().slice(0,10)}.json`;
+  return new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+}
+function buildCSV(){
+  const hist=load(K.hist,[]);
+  const esc=(v)=>{ const t=(v==null?"":String(v)); return /[",;\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t; };
+  const rows=[["Datum","Wochentag","Ort","Rad_Sonntag","Uebung","Satz","Gewicht_kg","Wiederholungen","Status"]];
+  const tt={di:"Dienstag",do:"Donnerstag",sa:"Samstag"};
+  hist.forEach(h=>{
+    const datum=(h.date||"").slice(0,10);
+    const tag=tt[h.day]||h.day||"";
+    const ort=h.bank?"mit Bank":"ohne Bank";
+    const rad=(h.rad===true)?"ja":(h.rad===false)?"nein":"";
+    (h.ex||[]).forEach(e=>{
+      const ueb=e.name||e.n||"";
+      if(e.skipped){ rows.push([datum,tag,ort,rad,ueb,"","","","ausgelassen"]); return; }
+      (e.sets||[]).forEach((st,i)=>{ rows.push([datum,tag,ort,rad,ueb,i+1,st.w||"",st.r||"","gemacht"]); });
+    });
+  });
+  const csv=rows.map(r=>r.map(esc).join(";")).join("\r\n");
+  return new Blob(["\ufeff"+csv],{type:"text/csv"});  // BOM für Excel-Umlaute
+}
+// Teilen (iOS Web Share mit Datei) mit Fallback auf Download
+async function shareOrDownload(blob, filename){
+  const file=new File([blob], filename, {type:blob.type});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:filename}); toast("Geteilt"); return; }catch(e){ if(e && e.name==="AbortError") return; }
+  }
+  const u=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=u;a.download=filename;
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);toast("Als Datei gesichert");
+}
+function exportData(){ const d=new Date().toISOString().slice(0,10);
+  shareOrDownload(buildBackupBlob(), `trainingslog_backup_${d}.json`);
+}
+function exportCSV(){ const d=new Date().toISOString().slice(0,10);
+  shareOrDownload(buildCSV(), `trainingslog_${d}.csv`);
 }
 function restoreData(){
   const inp=document.createElement("input"); inp.type="file"; inp.accept="application/json,.json";
@@ -680,7 +898,7 @@ function fmtDate(iso){return new Date(iso).toLocaleDateString("de-DE",{weekday:"
 function fmtDateShort(iso){return new Date(iso).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});}
 function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1500);}
 
-Object.assign(window,{setBank,setRad,openDay,renderHome,confirmBack,upd,repStep,addSet,delSet,goNext,goPrev,jumpTo,listSkip,toggleSkip,toggleAlt,toggleMore,chooseAlt,freeAlt,delCustom,applyAddSet,applyWeight,resetOneBest,setRest,openHowto,finishDay,showHistory,exportData,restoreData,renderSettings,saveSettings,resetSwaps});
+Object.assign(window,{setBank,setRad,openDay,renderHome,confirmBack,upd,repStep,addSet,delSet,goNext,goPrev,jumpTo,listSkip,toggleSkip,toggleAlt,toggleMore,chooseAlt,freeAlt,delCustom,applyAddSet,applyWeight,resetOneBest,setRest,openHowto,finishDay,showHistory,exportData,exportCSV,restoreData,renderSettings,saveSettings,resetSwaps});
 const app=document.getElementById("app");
 renderHome();
 </script>
