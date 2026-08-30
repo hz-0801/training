@@ -297,7 +297,9 @@ prüfen und ggf. behutsam nachbessern, aber keine Wunder erwarten und nichts
   .exfoot{display:flex;gap:8px;margin-top:8px;}
   .exfoot button{flex:1;font-size:14px;padding:9px;}
   .noteadd{display:inline-flex;align-items:center;gap:5px;background:transparent;border:none;color:var(--dim);font-size:13px;padding:6px 2px;margin:4px 0 0;text-align:left;width:auto;}
-  .noteinput{margin-top:4px;width:100%;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 10px;font-size:13px;font-family:inherit;}
+  .notemenu{margin:8px 2px 4px;}
+  .notemenu label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px;}
+  .noteinput{margin-top:0;width:100%;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 10px;font-size:13px;font-family:inherit;}
   .altsheet{margin-top:8px;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px;}
   .altsheet button{display:block;width:100%;text-align:left;margin-bottom:5px;background:var(--card);border:1px solid var(--line);font-size:14px;}
   .altsheet .free{display:flex;gap:6px;}
@@ -650,11 +652,6 @@ function exCard(e,ei){
     <div class="exfoot">
       <button class="restbtn" id="restBtn${ei}" data-rest="${e.rest}" onclick="startRest(${e.rest},${ei})">${e.rest}s ▶</button>
     </div>
-    ${(()=>{ const hasNote=!!(e.note&&e.note.trim()); const open=(noteOpen===ei)||hasNote;
-      return open
-        ? `<input class="noteinput" placeholder="Notiz" value="${(e.note||'').replace(/"/g,'&quot;')}" oninput="working.ex[${ei}].note=this.value;working.dirty=true">`
-        : `<button class="noteadd" onclick="openNote(${ei})">+ Notiz</button>`;
-    })()}
   </div>`;
 }
 const HOWTO={
@@ -696,6 +693,7 @@ function altSheet(e,ei){
       <div class="free"><input id="freeAlt${ei}" placeholder="andere Übung…"><button onclick="freeAlt(${ei})">ok</button></div>
     </div>`:''}
     ${(()=>{const bs=bestSummary(logKey(e.key));return bs?`<div class="exmeta" style="margin:8px 2px 4px">${bs}</div>`:'';})()}
+    <div class="notemenu"><label>Notiz</label><input class="noteinput" placeholder="z.B. Schulter zwickt" value="${(e.note||'').replace(/"/g,'&quot;')}" oninput="working.ex[${ei}].note=this.value;working.dirty=true"></div>
     <button onclick="openHowto(${ei})" style="text-align:center">Ausführung ansehen ↗</button>
     <button class="morebtn" onclick="toggleMore(${ei})">${showMore?'weniger ▴':'mehr ⋯'}</button>
     ${showMore?`<div class="morebox">
