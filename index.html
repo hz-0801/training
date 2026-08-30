@@ -324,7 +324,13 @@ prüfen und ggf. behutsam nachbessern, aber keine Wunder erwarten und nichts
   .resetline{margin-top:6px;}
   .resetline button{display:block;width:100%;background:var(--card);border:1px solid var(--danger);color:var(--danger);font-size:13px;text-align:center;padding:9px 4px;margin:0;}
   .altsheet .free input{flex:1;background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px;font-size:14px;}
-  .toolbar{display:flex;gap:8px;margin:4px 0 12px;}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 12px;}
+  .bkwarn{display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(255,180,84,.12);border:1px solid var(--warn);border-radius:10px;padding:11px 13px;margin:4px 0 12px;font-size:13px;color:var(--warn);cursor:pointer;}
+  .bkwarn .bkgo{font-weight:600;white-space:nowrap;}
+  .ablage{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin:0 0 14px;font-size:13px;color:var(--dim);line-height:1.5;}
+  .ablage-t{font-size:12px;color:var(--accent);font-weight:600;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;}
+  .ablage b{color:var(--txt);font-weight:600;}
+  .datbtn{display:block;width:100%;text-align:left;margin:0 0 10px;padding:13px 14px;}
   .toolbar button{flex:1;font-size:14px;}
   .hint{color:var(--dim);font-size:13px;margin:2px 2px 12px;line-height:1.4;}
   .backbtn{background:transparent;border:none;color:var(--accent);padding:6px 2px;font-size:16px;margin-bottom:2px;}
@@ -435,6 +441,16 @@ function slotName(key){
 function logKey(key){ return slotName(key); } // Werte pro tatsächlicher Übung
 
 /* ===== Home ===== */
+function backupReminder(){
+  const hist=load(K.hist,[]);
+  if(!hist.length) return "";                 // keine Daten -> nichts zu sichern
+  const lb=pref.lastBackup?new Date(pref.lastBackup):null;
+  const days = lb ? Math.floor((Date.now()-lb)/864e5) : null;
+  // Hinweis, wenn nie gesichert ODER letztes Backup > 14 Tage her
+  if(lb && days<14) return "";
+  const txt = lb ? `Letzte Sicherung vor ${days} Tagen` : "Noch nie gesichert";
+  return `<div class="bkwarn" onclick="renderData()"><span>${txt} — jetzt sichern?</span><span class="bkgo">Daten sichern ›</span></div>`;
+}
 function renderHome(){
   wakeOff();
   working=null;altOpen=-1;
@@ -478,12 +494,11 @@ function renderHome(){
     <div class="daylist">
       ${days.map(d=>`<div class="daybtn ${d.k===nextK?'heavy':''}" onclick="openDay('${d.k}')">${d.t}<small>${d.sub}</small></div>`).join("")}
     </div>
+    ${backupReminder()}
     <div class="toolbar">
       <button class="btn-ghost" onclick="renderSettings()">Einstellungen</button>
-      <button class="btn-ghost" onclick="exportData()">Backup</button>
-      <button class="btn-ghost" onclick="exportCSV()">Tabelle (CSV)</button>
-      <button class="btn-ghost" onclick="showHistory()">Verlauf</button>
-      <button class="btn-ghost" onclick="restoreData()">Wiederherstellen</button>
+      <button class="btn-ghost" onclick="showHistory()">Historie</button>
+      <button class="btn-ghost" onclick="renderData()">Daten sichern</button>
     </div>
 `;
   hideTimer();
@@ -865,7 +880,8 @@ function resetSwaps(){ if(confirm("Alle Übungswechsel zurücksetzen?")){swap={}
 function showHistory(){
   const hist=load(K.hist,[]).slice().reverse();
   const tt={di:"Di",do:"Do",sa:"Sa"};
-  app.innerHTML=`<button class="backbtn" onclick="renderHome()">‹ Übersicht</button><h1>Verlauf</h1>`+
+  app.innerHTML=`<button class="backbtn" onclick="renderHome()">‹ Übersicht</button><h1>Historie</h1>
+    <button class="btn-ghost" style="width:100%;margin-bottom:12px" onclick="exportCSV()">Als Tabelle exportieren (CSV)</button>`+
     (hist.length?hist.map(h=>`<div class="card"><div class="exname">${tt[h.day]||h.day} <span class="exmeta">· ${fmtDate(h.date)} · ${h.bank?'mit Bank':'ohne'}</span></div>
       ${h.ex.map(e=>`<div class="exmeta" style="margin-top:6px;color:var(--txt)">${e.name||e.n}</div>${e.skipped?`<div class="exmeta" style="color:var(--dim)">ausgelassen</div>`:`<div class="exmeta">${(e.sets||[]).map(s=>`${s.w||"–"}×${s.r||"–"}`).join("  ·  ")}</div>${e.note?`<div class="exmeta" style="color:var(--warn)">📝 ${e.note}</div>`:""}`}`).join("")}</div>`).join("")
     :`<div class="hint">Noch nichts gespeichert.</div>`);
@@ -905,10 +921,23 @@ async function shareOrDownload(blob, filename){
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);toast("Als Datei gesichert");
 }
 function exportData(){ const d=new Date().toISOString().slice(0,10);
+  pref.lastBackup=new Date().toISOString(); save(K.pref,pref);
   shareOrDownload(buildBackupBlob(), `trainingslog_backup_${d}.json`);
 }
 function exportCSV(){ const d=new Date().toISOString().slice(0,10);
   shareOrDownload(buildCSV(), `trainingslog_${d}.csv`);
+}
+function renderData(){
+  const lb=pref.lastBackup?new Date(pref.lastBackup):null;
+  const lbTxt = lb ? `Zuletzt gesichert: ${fmtDate(pref.lastBackup)}` : "Noch nie gesichert";
+  app.innerHTML=`<button class="backbtn" onclick="renderHome()">‹ Übersicht</button><h1>Daten sichern</h1>
+    <div class="setbox">
+      <p class="exmeta" style="margin:0 0 16px;color:${lb?'var(--dim)':'var(--warn)'}">${lbTxt}</p>
+      <button class="btn-ghost datbtn" onclick="exportData()">Sichern</button>
+      <button class="btn-ghost datbtn" onclick="restoreData()">Zurückladen</button>
+      <p class="exmeta" style="margin:16px 0 0;padding-top:14px;border-top:1px solid var(--line)">Ablage: Google Drive → Ordner „Trainingdaten"</p>
+    </div>`;
+  hideTimer();
 }
 function restoreData(){
   const inp=document.createElement("input"); inp.type="file"; inp.accept="application/json,.json";
@@ -962,7 +991,7 @@ function fmtDate(iso){return new Date(iso).toLocaleDateString("de-DE",{weekday:"
 function fmtDateShort(iso){return new Date(iso).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});}
 function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1500);}
 
-Object.assign(window,{setBank,setRad,openDay,renderHome,confirmBack,leaveSave,leaveDiscard,leaveStay,upd,repStep,addSet,delSet,goNext,goPrev,jumpTo,listSkip,toggleSkip,toggleAlt,toggleMore,chooseAlt,freeAlt,delCustom,openNote,applyAddSet,applyWeight,resetOneBest,setRest,openHowto,finishDay,showHistory,exportData,exportCSV,restoreData,renderSettings,saveSettings,resetSwaps});
+Object.assign(window,{setBank,setRad,openDay,renderHome,confirmBack,leaveSave,leaveDiscard,leaveStay,upd,repStep,addSet,delSet,goNext,goPrev,jumpTo,listSkip,toggleSkip,toggleAlt,toggleMore,chooseAlt,freeAlt,delCustom,openNote,applyAddSet,applyWeight,resetOneBest,setRest,openHowto,finishDay,showHistory,exportData,exportCSV,restoreData,renderSettings,renderData,saveSettings,resetSwaps});
 const app=document.getElementById("app");
 renderHome();
 </script>
