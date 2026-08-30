@@ -360,7 +360,7 @@ const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){toast
 let last=load(K.last,{}), struct=load(K.struct,{}), swap=load(K.swap,{}), best=load(K.best,{}), custom=load(K.custom,{});
 let pref=load(K.pref,{bank:true,stepBank:1,stepNoBank:2.5,confirm:2,keepAwake:true});
 let radWeek=load(K.radwk,null);
-let working=null, altOpen=-1;
+let working=null, altOpen=-1, noteOpen=-1;
 
 /* ===== Wochenlogik ===== */
 function isoWeekKey(d=new Date()){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dy=(t.getUTCDay()+6)%7;t.setUTCDate(t.getUTCDate()-dy+3);const f=new Date(Date.UTC(t.getUTCFullYear(),0,4));const w=1+Math.round(((t-f)/864e5-3+((f.getUTCDay()+6)%7))/7);return `${t.getUTCFullYear()}-W${String(w).padStart(2,"0")}`;}
