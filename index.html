@@ -292,6 +292,15 @@ NICHT gleich behandelt werden.
   .toolbar button{flex:1;font-size:14px;}
   .hint{color:var(--dim);font-size:13px;margin:2px 2px 12px;line-height:1.4;}
   .backbtn{background:transparent;border:none;color:var(--accent);padding:6px 2px;font-size:16px;margin-bottom:2px;}
+  .leaveov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:none;align-items:center;justify-content:center;padding:24px;}
+  .leaveov.show{display:flex;}
+  .leavebox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 18px;width:100%;max-width:340px;box-shadow:0 12px 40px rgba(0,0,0,.5);}
+  .leavetitle{font-size:18px;font-weight:600;color:var(--txt);margin-bottom:6px;}
+  .leavesub{font-size:14px;color:var(--dim);margin-bottom:18px;}
+  .leavebox button{display:block;width:100%;margin:8px 0 0;padding:14px;border-radius:10px;font-size:15px;font-weight:600;border:1px solid var(--line);}
+  .lv-save{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .lv-discard{background:var(--card2);color:var(--danger);border-color:var(--danger);}
+  .lv-stay{background:var(--card2);color:var(--txt);}
   .toast{position:fixed;top:calc(12px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:100;opacity:0;transition:.25s;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.4);}
   .toast.show{opacity:1;}
   .setbox{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-bottom:10px;}
@@ -302,6 +311,15 @@ NICHT gleich behandelt werden.
 </head>
 <body>
 <div class="wrap" id="app"></div>
+<div id="leaveOverlay" class="leaveov">
+  <div class="leavebox">
+    <div class="leavetitle">Training verlassen?</div>
+    <div class="leavesub">Möchtest du die Einheit speichern?</div>
+    <button class="lv-save" onclick="leaveSave()">Speichern &amp; verlassen</button>
+    <button class="lv-discard" onclick="leaveDiscard()">Nicht speichern &amp; verlassen</button>
+    <button class="lv-stay" onclick="leaveStay()">Zurück zum Training</button>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -771,11 +789,19 @@ function finishDay(){
 }
 function confirmBack(){
   if(!working || !working.dirty){ renderHome(); return; }  // nichts geändert -> direkt raus
-  // 1. Dialog: speichern?  OK = speichern & verlassen / Abbrechen = weiter entscheiden
-  if(confirm("Einheit speichern und verlassen?\n\nOK = speichern & verlassen\nAbbrechen = nicht speichern")){ finishDay(); return; }
-  // 2. Dialog: wirklich verwerfen?  OK = verwerfen & raus / Abbrechen = zurück ins Training
-  if(confirm("Ohne Speichern verlassen? Eingaben gehen verloren.\n\nOK = verwerfen & verlassen\nAbbrechen = zurück zum Training")){ renderHome(); }
+  showLeaveDialog();
 }
+function showLeaveDialog(){
+  const ov=document.getElementById("leaveOverlay");
+  if(ov) ov.classList.add("show");
+}
+function hideLeaveDialog(){
+  const ov=document.getElementById("leaveOverlay");
+  if(ov) ov.classList.remove("show");
+}
+function leaveSave(){ hideLeaveDialog(); finishDay(); }
+function leaveDiscard(){ hideLeaveDialog(); renderHome(); }
+function leaveStay(){ hideLeaveDialog(); }
 
 /* ===== Einstellungen ===== */
 function renderSettings(){
@@ -904,7 +930,7 @@ function fmtDate(iso){return new Date(iso).toLocaleDateString("de-DE",{weekday:"
 function fmtDateShort(iso){return new Date(iso).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});}
 function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1500);}
 
-Object.assign(window,{setBank,setRad,openDay,renderHome,confirmBack,upd,repStep,addSet,delSet,goNext,goPrev,jumpTo,listSkip,toggleSkip,toggleAlt,toggleMore,chooseAlt,freeAlt,delCustom,openNote,applyAddSet,applyWeight,resetOneBest,setRest,openHowto,finishDay,showHistory,exportData,exportCSV,restoreData,renderSettings,saveSettings,resetSwaps});
+Object.assign(window,{setBank,setRad,openDay,renderHome,confirmBack,leaveSave,leaveDiscard,leaveStay,upd,repStep,addSet,delSet,goNext,goPrev,jumpTo,listSkip,toggleSkip,toggleAlt,toggleMore,chooseAlt,freeAlt,delCustom,openNote,applyAddSet,applyWeight,resetOneBest,setRest,openHowto,finishDay,showHistory,exportData,exportCSV,restoreData,renderSettings,saveSettings,resetSwaps});
 const app=document.getElementById("app");
 renderHome();
 </script>
