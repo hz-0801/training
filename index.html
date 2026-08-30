@@ -262,7 +262,8 @@ NICHT gleich behandelt werden.
   .restbtn.done{color:var(--good);font-weight:700;}
   .exfoot{display:flex;gap:8px;margin-top:8px;}
   .exfoot button{flex:1;font-size:14px;padding:9px;}
-  .noteinput{width:100%;margin-top:8px;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px;font-size:14px;font-family:inherit;}
+  .noteadd{display:inline-flex;align-items:center;gap:5px;background:transparent;border:none;color:var(--dim);font-size:13px;padding:6px 2px;margin:4px 0 0;text-align:left;width:auto;}
+  .noteinput{margin-top:4px;width:100%;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 10px;font-size:13px;font-family:inherit;}
   .altsheet{margin-top:8px;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px;}
   .altsheet button{display:block;width:100%;text-align:left;margin-bottom:5px;background:var(--card);border:1px solid var(--line);font-size:14px;}
   .altsheet .free{display:flex;gap:6px;}
@@ -564,7 +565,7 @@ function startExPause(sec){ prime(); if(exH)clearInterval(exH); let r=sec;
     if(r<=0){ clearInterval(exH); exH=null; beep(); }   // genau ein Ton nach Ablauf
   },1000);
 }
-function jumpTo(i){ if(i==null||i<0||i>=working.ex.length)return; working.cur=i; altOpen=-1; renderDay(); focusCur(); }
+function jumpTo(i){ if(i==null||i<0||i>=working.ex.length)return; working.cur=i; altOpen=-1; noteOpen=-1; renderDay(); focusCur(); }
 function goPrev(){ const p=prevActive(working.cur); if(p>=0){working.cur=p; renderDay(); focusCur();} }
 function listSkip(i){ working.ex[i].skipped=!working.ex[i].skipped;
   struct[working.ex[i].key]=struct[working.ex[i].key]||{}; struct[working.ex[i].key].skipped=working.ex[i].skipped; save(K.struct,struct);
@@ -597,7 +598,11 @@ function exCard(e,ei){
     <div class="exfoot">
       <button class="restbtn" id="restBtn${ei}" data-rest="${e.rest}" onclick="startRest(${e.rest},${ei})">${e.rest}s ▶</button>
     </div>
-    <input class="noteinput" placeholder="Notiz" value="${(e.note||'').replace(/"/g,'&quot;')}" oninput="working.ex[${ei}].note=this.value;working.dirty=true">
+    ${(()=>{ const hasNote=!!(e.note&&e.note.trim()); const open=(noteOpen===ei)||hasNote;
+      return open
+        ? `<input class="noteinput" placeholder="Notiz" value="${(e.note||'').replace(/"/g,'&quot;')}" oninput="working.ex[${ei}].note=this.value;working.dirty=true">`
+        : `<button class="noteadd" onclick="openNote(${ei})">+ Notiz</button>`;
+    })()}
   </div>`;
 }
 const HOWTO={
@@ -670,6 +675,7 @@ function chooseAlt(ei,name){ if(working)working.dirty=true;
   if(name===SLOTS[key].name && !SLOTS[key].floor) delete swap[key]; else swap[key]=name;
   save(K.swap,swap); altOpen=ei; reopenDay();
 }
+function openNote(ei){ noteOpen=ei; renderDay(); setTimeout(()=>{const el=document.querySelector(".noteinput");if(el)el.focus();},30); }
 function freeAlt(ei){ if(working)working.dirty=true;
   const v=document.getElementById("freeAlt"+ei).value.trim(); if(!v)return;
   const key=working.ex[ei].key;
@@ -898,7 +904,7 @@ function fmtDate(iso){return new Date(iso).toLocaleDateString("de-DE",{weekday:"
 function fmtDateShort(iso){return new Date(iso).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});}
 function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1500);}
 
-Object.assign(window,{setBank,setRad,openDay,renderHome,confirmBack,upd,repStep,addSet,delSet,goNext,goPrev,jumpTo,listSkip,toggleSkip,toggleAlt,toggleMore,chooseAlt,freeAlt,delCustom,applyAddSet,applyWeight,resetOneBest,setRest,openHowto,finishDay,showHistory,exportData,exportCSV,restoreData,renderSettings,saveSettings,resetSwaps});
+Object.assign(window,{setBank,setRad,openDay,renderHome,confirmBack,upd,repStep,addSet,delSet,goNext,goPrev,jumpTo,listSkip,toggleSkip,toggleAlt,toggleMore,chooseAlt,freeAlt,delCustom,openNote,applyAddSet,applyWeight,resetOneBest,setRest,openHowto,finishDay,showHistory,exportData,exportCSV,restoreData,renderSettings,saveSettings,resetSwaps});
 const app=document.getElementById("app");
 renderHome();
 </script>
